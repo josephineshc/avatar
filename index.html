@@ -1,55 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <!-- 아래 이 한 줄이 에러 해결의 핵심입니다. 절대 지우거나 수정하지 마세요 -->
   <base href="/avatar/">
+
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Avatar Face Masking">
 
-  <!-- MediaPipe Scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3"></script>
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="avatar">
 
   <title>Avatar Mirror</title>
-  
+
+  <!-- MediaPipe Scripts 로드 -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3"></script>
+
   <script>
     let faceLandmarker;
     let videoElement;
 
-    // Initialize MediaPipe
+    // AI 초기화 함수
     async function initTracking() {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
-      );
-      faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-          delegate: "GPU"
-        },
-        outputFaceBlendshapes: true,
-        runningMode: "VIDEO",
-        numFaces: 1
-      });
-      console.log("MediaPipe Face Landmarker Initialized");
+      try {
+        if (typeof tasksVision === 'undefined') {
+          throw new Error("MediaPipe 라이브러리 로드 실패");
+        }
+        const vision = await tasksVision.FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+        );
+        faceLandmarker = await tasksVision.FaceLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+            delegate: "GPU"
+          },
+          outputFaceBlendshapes: true,
+          runningMode: "VIDEO",
+          numFaces: 1
+        });
+        console.log("MediaPipe initialized");
+      } catch (e) {
+        console.error("AI Init Error:", e);
+        throw e;
+      }
     }
 
-    // Bridge to find the video element created by Flutter Camera Plugin
+    // Dart에서 호출하여 얼굴 데이터를 가져가는 함수
     window.getFaceData = function() {
       if (!faceLandmarker) return null;
-      
-      // Find the camera video element in the DOM
-      if (!videoElement) {
-        videoElement = document.querySelector('video');
-      }
-
+      if (!videoElement) videoElement = document.querySelector('video');
       if (!videoElement || videoElement.readyState !== 4) return null;
 
-      const result = faceLandmarker.detectForVideo(videoElement, performance.now());
-      
-      if (result.faceLandmarks && result.faceLandmarks.length > 0) {
-        return {
-          landmarks: result.faceLandmarks[0],
-          blendshapes: result.faceBlendshapes[0].categories
-        };
+      try {
+        const result = faceLandmarker.detectForVideo(videoElement, performance.now());
+        if (result && result.faceLandmarks && result.faceLandmarks.length > 0) {
+          return {
+            landmarks: result.faceLandmarks[0],
+            blendshapes: result.faceBlendshapes[0].categories
+          };
+        }
+      } catch (e) {
+        return null;
       }
       return null;
     };
