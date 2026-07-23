@@ -454,81 +454,88 @@ class _FaceMirror extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final containerW = constraints.maxWidth;
-        final containerH = constraints.maxHeight;
+        final viewW = constraints.maxWidth;
+        final viewH = constraints.maxHeight;
         
-        // Web camera aspect ratios vary, we calculate 'Cover' scale
         final previewSize = camera.value.previewSize!;
         final previewAspect = previewSize.height / previewSize.width;
-        final containerAspect = containerW / containerH;
+        final viewAspect = viewW / viewH;
 
-        double displayedW, displayedH;
-        if (containerAspect > previewAspect) {
-          displayedW = containerW;
-          displayedH = containerW / previewAspect;
+        double drawW, drawH;
+        if (viewAspect > previewAspect) {
+          drawW = viewW;
+          drawH = viewW / previewAspect;
         } else {
-          displayedH = containerH;
-          displayedW = containerH * previewAspect;
+          drawH = viewH;
+          drawW = viewH * previewAspect;
         }
 
-        final offsetX = (containerW - displayedW) / 2;
-        final offsetY = (containerH - displayedH) / 2;
-
-        Widget? avatarOverlay;
-        if (expression.faceFound && expression.faceRect != null) {
-          final rect = expression.faceRect!;
-          final cx = rect.left + rect.width / 2;
-          final cy = rect.top + rect.height / 2;
-          
-          // Mask scale: 1.8x the face box to cover hair/ears
-          final faceSize = (rect.width > rect.height ? rect.width : rect.height) * displayedW;
-          final avatarSize = faceSize * 1.8;
-
-          avatarOverlay = Positioned(
-            left: offsetX + (cx * displayedW) - (avatarSize / 2),
-            top: offsetY + (cy * displayedH) - (avatarSize / 2),
-            width: avatarSize,
-            height: avatarSize,
-            child: CustomPaint(
-              size: Size(avatarSize, avatarSize),
-              painter: AvatarPainter(
-                baseId: baseId,
-                hairId: hairId,
-                baseColor: baseColor,
-                eyeOpenLeft: expression.eyeOpenLeft,
-                eyeOpenRight: expression.eyeOpenRight,
-                mouthOpen: expression.mouthOpen,
-                smile: expression.smile,
-                browRaiseLeft: expression.browRaiseLeft,
-                browRaiseRight: expression.browRaiseRight,
-                moodColor: moodColor,
-              ),
-            ),
-          );
-        }
+        final offsetX = (viewW - drawW) / 2;
+        final offsetY = (viewH - drawH) / 2;
 
         return Stack(
           children: [
-            // Mirrored Camera
-            Transform.scale(
-              scaleX: -1,
-              child: Center(
+            // 1. Camera Feed (Mirrored)
+            Center(
+              child: Transform.scale(
+                scaleX: -1,
                 child: SizedBox(
-                  width: displayedW,
-                  height: displayedH,
+                  width: drawW,
+                  height: drawH,
                   child: CameraPreview(camera),
                 ),
               ),
             ),
-            // Mirrored Avatar Mask
-            if (avatarOverlay != null)
-              Transform.scale(
-                scaleX: -1,
-                child: avatarOverlay,
+
+            // 2. Avatar Overlay (Mirrored to match camera)
+            if (expression.faceFound && expression.faceRect != null)
+              Center(
+                child: Transform.scale(
+                  scaleX: -1,
+                  child: SizedBox(
+                    width: drawW,
+                    height: drawH,
+                    child: Stack(
+                      children: [
+                        _buildAvatar(expression.faceRect!, drawW, drawH),
+                      ],
+                    ),
+                  ),
+                ),
               ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildAvatar(Rect rect, double w, double h) {
+    // 1. Calculate face center in pixels
+    final cx = (rect.left + rect.width / 2) * w;
+    final cy = (rect.top + rect.height / 2) * h;
+    
+    // 2. Avatar size (1.8x the detected face width to cover ears/hair)
+    final avatarSize = rect.width * w * 1.8;
+
+    return Positioned(
+      left: cx - (avatarSize / 2),
+      top: cy - (avatarSize / 2),
+      width: avatarSize,
+      height: avatarSize,
+      child: CustomPaint(
+        painter: AvatarPainter(
+          baseId: baseId,
+          hairId: hairId,
+          baseColor: baseColor,
+          eyeOpenLeft: expression.eyeOpenLeft,
+          eyeOpenRight: expression.eyeOpenRight,
+          mouthOpen: expression.mouthOpen,
+          smile: expression.smile,
+          browRaiseLeft: expression.browRaiseLeft,
+          browRaiseRight: expression.browRaiseRight,
+          moodColor: moodColor,
+        ),
+      ),
     );
   }
 }

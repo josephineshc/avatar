@@ -70,49 +70,59 @@ class FaceTrackingController extends ChangeNotifier {
   }
 
   void _updateTracking() {
-    if (_disposed || !isReady) return;
+  if (_disposed || !isReady) return;
 
-    final data = js.context.callMethod('getFaceData');
-    
-    if (data == null) {
-      if (expression.faceFound) {
-        expression = FaceExpression(faceFound: false, faceRect: expression.faceRect);
-        notifyListeners();
-      }
-      return;
+  final data = js.context.callMethod('getFaceData');
+  
+  if (data == null) {
+    // If face was lost, only notify if it was previously found
+    if (expression.faceFound) {
+      expression = FaceExpression(
+        faceFound: false, 
+        faceRect: expression.faceRect,
+        eyeOpenLeft: 1.0, eyeOpenRight: 1.0, mouthOpen: 0.0 // Reset to neutral
+      );
+      notifyListeners();
     }
+    return;
+  }
 
+  try {
     final landmarks = data['landmarks'] as List;
     final blendshapes = data['blendshapes'] as List;
 
-    // 1. Calculate Bounding Box from landmarks
+    // Calculate Bounding Box with a small buffer
     double minX = 1.0, maxX = 0.0, minY = 1.0, maxY = 0.0;
     for (var pt in landmarks) {
-      double x = pt['x']; double y = pt['y'];
+      double x = pt['x'].toDouble(); 
+      double y = pt['y'].toDouble();
       if (x < minX) minX = x; if (x > maxX) maxX = x;
       if (y < minY) minY = y; if (y > maxY) maxY = y;
     }
 
-    // 2. Map AI Blendshapes to Expression
-    // MediaPipe scores are 0.0 - 1.0
+    // Convert blendshapes to a usable map
     Map<String, double> scores = {};
     for (var b in blendshapes) {
-      scores[b['categoryName']] = b['score'];
+      scores[b['categoryName']] = b['score'].toDouble();
     }
 
+    // Smooth the values slightly
     expression = FaceExpression(
       faceFound: true,
       faceRect: Rect.fromLTRB(minX, minY, maxX, maxY),
       eyeOpenLeft: 1.0 - (scores['eyeBlinkLeft'] ?? 0),
       eyeOpenRight: 1.0 - (scores['eyeBlinkRight'] ?? 0),
-      mouthOpen: (scores['jawOpen'] ?? 0) * 1.8,
+      mouthOpen: (scores['jawOpen'] ?? 0) * 1.5,
       smile: ((scores['mouthSmileLeft'] ?? 0) + (scores['mouthSmileRight'] ?? 0)) / 2,
       browRaiseLeft: scores['browInnerUp'] ?? 0,
       browRaiseRight: scores['browInnerUp'] ?? 0,
     );
 
     notifyListeners();
+  } catch (e) {
+    // If parsing fails, just ignore this frame
   }
+}
 
   @override
   void dispose() {
