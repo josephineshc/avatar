@@ -4,76 +4,8 @@
   <base href="/avatar/">
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Avatar Face Masking">
+  <meta name="description" content="Avatar Mirror App">
   <title>Avatar Mirror</title>
-
-  <!-- 1. 가장 안정적인 unpkg 소스로 교체 -->
-  <script src="https://unpkg.com/@mediapipe/tasks-vision@0.10.3/vision_bundle.js" crossorigin="anonymous"></script>
-
-  <script>
-    let faceLandmarker;
-    let videoElement;
-    let isAiReady = false;
-
-    async function initTracking() {
-      if (isAiReady) return true;
-
-      try {
-        console.log("전역 객체 뒤지는 중...");
-        
-        // 2. 모든 가능한 위치를 다 뒤집니다.
-        const mp = window.tasksVision || window;
-        const FL = mp.FaceLandmarker || window.FaceLandmarker;
-        const FR = mp.FilesetResolver || window.FilesetResolver;
-
-        if (!FL || !FR) {
-          console.log("도구 상자를 아직 못 찾음. 현재 window 객체 상태:", Object.keys(window).filter(k => k.includes('Face')));
-          await new Promise(r => setTimeout(r, 1000));
-          return initTracking();
-        }
-
-        console.log("도구 발견! AI 엔진 시동 중...");
-
-        const vision = await FR.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
-        );
-        
-        faceLandmarker = await FL.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-            delegate: "GPU"
-          },
-          outputFaceBlendshapes: true,
-          runningMode: "VIDEO",
-          numFaces: 1
-        });
-        
-        isAiReady = true;
-        console.log("AI 준비 완료! 이제 얼굴을 비춰주세요.");
-        return true;
-      } catch (e) {
-        console.error("AI 초기화 중 치명적 오류:", e);
-        throw e;
-      }
-    }
-
-    window.getFaceData = function() {
-      if (!isAiReady || !faceLandmarker) return "LOADING";
-      if (!videoElement) videoElement = document.querySelector('video');
-      if (!videoElement || videoElement.readyState !== 4) return "NO_VIDEO";
-
-      try {
-        const result = faceLandmarker.detectForVideo(videoElement, performance.now());
-        if (result && result.faceLandmarks && result.faceLandmarks.length > 0) {
-          return {
-            landmarks: result.faceLandmarks[0],
-            blendshapes: result.faceBlendshapes[0].categories
-          };
-        }
-      } catch (e) { return "ERROR"; }
-      return "NO_FACE";
-    };
-  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
