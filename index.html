@@ -7,33 +7,32 @@
   <meta name="description" content="Avatar Face Masking">
   <title>Avatar Mirror</title>
 
-  <!-- 1. 라이브러리를 동기적으로 로드 (async 제거) -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3" type="text/javascript"></script>
+  <!-- 1. 가장 안정적인 unpkg 소스로 교체 -->
+  <script src="https://unpkg.com/@mediapipe/tasks-vision@0.10.3/vision_bundle.js" crossorigin="anonymous"></script>
 
   <script>
     let faceLandmarker;
     let videoElement;
     let isAiReady = false;
-    let aiInitError = null;
 
     async function initTracking() {
       if (isAiReady) return true;
-      if (aiInitError) throw new Error(aiInitError);
 
       try {
-        console.log("AI 초기화 시도 중...");
+        console.log("전역 객체 뒤지는 중...");
         
-        // 2. 클래스 탐색 (window 바로 아래 또는 tasksVision 아래)
+        // 2. 모든 가능한 위치를 다 뒤집니다.
         const mp = window.tasksVision || window;
-        const FL = mp.FaceLandmarker;
-        const FR = mp.FilesetResolver;
+        const FL = mp.FaceLandmarker || window.FaceLandmarker;
+        const FR = mp.FilesetResolver || window.FilesetResolver;
 
         if (!FL || !FR) {
-          // 클래스가 아직 없으면 1초만 더 기다려봅니다.
-          console.log("클래스 대기 중... 1초 후 재시도");
+          console.log("도구 상자를 아직 못 찾음. 현재 window 객체 상태:", Object.keys(window).filter(k => k.includes('Face')));
           await new Promise(r => setTimeout(r, 1000));
-          return initTracking(); 
+          return initTracking();
         }
+
+        console.log("도구 발견! AI 엔진 시동 중...");
 
         const vision = await FR.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
@@ -50,11 +49,10 @@
         });
         
         isAiReady = true;
-        console.log("AI 엔진 준비 완료!");
+        console.log("AI 준비 완료! 이제 얼굴을 비춰주세요.");
         return true;
       } catch (e) {
-        aiInitError = e.message;
-        console.error("AI 초기화 상세 오류:", e);
+        console.error("AI 초기화 중 치명적 오류:", e);
         throw e;
       }
     }
