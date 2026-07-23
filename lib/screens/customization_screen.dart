@@ -66,8 +66,7 @@ const _line = Color(0xFFE1E6DF);
 
 /// STEP 2~4를 한 화면에 합친 커스터마이징 화면.
 /// 좌측: 베이스·머리·색상·마음 선택 메뉴
-/// 가운데: 카메라로 표정을 실시간 추적해, 감지된 얼굴 위치·크기에 맞춰
-///        아바타를 그대로 겹쳐 보여주는 '거울'
+/// 가운데: 카메라로 표정을 실시간 추적해 그대로 반영하는 '거울'
 class CustomizationScreen extends StatefulWidget {
   const CustomizationScreen({super.key});
 
@@ -81,6 +80,7 @@ class _CustomizationScreenState extends State<CustomizationScreen> {
   String _baseId = _bases.first.id;
   String _hairId = 'none';
   Color _baseColor = _bases.first.color;
+  Color _outfitColor = _sageLight;
   String? _moodId;
 
   @override
@@ -136,10 +136,12 @@ class _CustomizationScreenState extends State<CustomizationScreen> {
               baseId: _baseId,
               hairId: _hairId,
               baseColor: _baseColor,
+              outfitColor: _outfitColor,
               moodId: _moodId,
               onSelectBase: _selectBase,
               onSelectHair: (id) => setState(() => _hairId = id),
               onBaseColor: (c) => setState(() => _baseColor = c),
+              onOutfitColor: (c) => setState(() => _outfitColor = c),
               onSelectMood: (id) => setState(() => _moodId = _moodId == id ? null : id),
             ),
             Expanded(
@@ -148,6 +150,7 @@ class _CustomizationScreenState extends State<CustomizationScreen> {
                 baseId: _baseId,
                 hairId: _hairId,
                 baseColor: _baseColor,
+                outfitColor: _outfitColor,
                 moodColor: _moodColor,
               ),
             ),
@@ -165,20 +168,24 @@ class _CustomizationPanel extends StatelessWidget {
     required this.baseId,
     required this.hairId,
     required this.baseColor,
+    required this.outfitColor,
     required this.moodId,
     required this.onSelectBase,
     required this.onSelectHair,
     required this.onBaseColor,
+    required this.onOutfitColor,
     required this.onSelectMood,
   });
 
   final String baseId;
   final String hairId;
   final Color baseColor;
+  final Color outfitColor;
   final String? moodId;
   final ValueChanged<_BaseOption> onSelectBase;
   final ValueChanged<String> onSelectHair;
   final ValueChanged<Color> onBaseColor;
+  final ValueChanged<Color> onOutfitColor;
   final ValueChanged<String> onSelectMood;
 
   @override
@@ -248,6 +255,10 @@ class _CustomizationPanel extends StatelessWidget {
             const _PanelLabel('바탕 색'),
             const SizedBox(height: 8),
             _ColorGrid(value: baseColor, onChanged: onBaseColor),
+            const SizedBox(height: 20),
+            const _PanelLabel('옷 색'),
+            const SizedBox(height: 8),
+            _ColorGrid(value: outfitColor, onChanged: onOutfitColor),
             const SizedBox(height: 20),
             const _PanelLabel('마음'),
             const SizedBox(height: 4),
@@ -330,12 +341,15 @@ class _ColorGrid extends StatelessWidget {
 
 /* ------------------------------ 가운데 거울 ------------------------------ */
 
+/// 화면 정중앙에 큰 '거울'(카메라 프리뷰)을 놓고, 그 위에 아바타를 겹쳐
+/// 그려서 마치 거울에 비친 내 얼굴이 아바타로 바뀐 것처럼 보이게 합니다.
 class _MirrorPanel extends StatelessWidget {
   const _MirrorPanel({
     required this.tracking,
     required this.baseId,
     required this.hairId,
     required this.baseColor,
+    required this.outfitColor,
     required this.moodColor,
   });
 
@@ -343,6 +357,7 @@ class _MirrorPanel extends StatelessWidget {
   final String baseId;
   final String hairId;
   final Color baseColor;
+  final Color outfitColor;
   final Color? moodColor;
 
   @override
@@ -354,7 +369,7 @@ class _MirrorPanel extends StatelessWidget {
           child: Text(
             tracking.error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF5B6960), height: 1.5),
+            style: const TextStyle(color: _inkSoft, height: 1.5),
           ),
         ),
       );
@@ -371,155 +386,93 @@ class _MirrorPanel extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // --- 이 부분이 상태 메시지 배지입니다 ---
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: tracking.expression.faceFound 
-                      ? const Color(0xFFDCE7DF) // 얼굴 찾았을 때 연두색
-                      : const Color(0xFFEDEAF6), // 못 찾았을 때 연보라색
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: _lavenderLight, borderRadius: BorderRadius.circular(999)),
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      tracking.expression.faceFound ? Icons.face : Icons.hourglass_empty,
-                      size: 14,
-                      color: tracking.expression.faceFound ? const Color(0xFF4F6F5C) : const Color(0xFF8B85B8),
-                    ),
-                    const SizedBox(width: 6),
+                    Icon(Icons.auto_awesome, size: 12, color: _lavender),
+                    SizedBox(width: 4),
+                    Text('실시간 거울', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _lavender)),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
 
               // 거울 프레임
               Container(
                 width: mirrorWidth,
                 height: mirrorHeight,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDCE7DF),
+                  color: _sageLight,
                   borderRadius: BorderRadius.circular(32),
-                  border: Border.all(color: const Color(0xFFE1E6DF), width: 1.5),
+                  border: Border.all(color: _line, width: 1.5),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 28, offset: const Offset(0, 12)),
+                    BoxShadow(color: _ink.withOpacity(0.08), blurRadius: 28, offset: const Offset(0, 12)),
                   ],
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: cameraReady
-                    ? _FaceMirror( // 아까 드린 _FaceMirror 클래스가 여기 호출됨
-                        camera: camera,
-                        expression: tracking.expression,
-                        baseId: baseId,
-                        hairId: hairId,
-                        baseColor: baseColor,
-                        moodColor: moodColor,
-                      )
-                    : const Center(child: CircularProgressIndicator()), // 로딩 뱅글이
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // 배경: 실제 카메라 화면 (거울처럼 좌우 반전)
+                    if (cameraReady)
+                      Positioned.fill(
+                        child: Transform.scale(
+                          scaleX: -1,
+                          child: CameraPreview(camera),
+                        ),
+                      ),
+                    // 카메라 위를 살짝 눌러서 아바타가 더 도드라지도록
+                    if (cameraReady) Positioned.fill(child: Container(color: Colors.black.withOpacity(0.06))),
+
+                    // 숨쉬는 오라
+                    Container(
+                      width: mirrorWidth * 0.62,
+                      height: mirrorWidth * 0.62,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            (moodColor ?? _sage).withOpacity(0.32),
+                            (moodColor ?? _sage).withOpacity(0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // 아바타 — 거울(카메라 화면) 위에 그대로 매핑
+                    SizedBox(
+                      width: mirrorWidth * 0.56,
+                      height: mirrorWidth * 0.56,
+                      child: CustomPaint(
+                        painter: AvatarPainter(
+                          baseId: baseId,
+                          hairId: hairId,
+                          baseColor: baseColor,
+                          eyeOpenLeft: tracking.expression.eyeOpenLeft,
+                          eyeOpenRight: tracking.expression.eyeOpenRight,
+                          mouthOpen: tracking.expression.mouthOpen,
+                          smile: tracking.expression.smile,
+                          moodColor: moodColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 14),
               Text(
                 tracking.expression.faceFound ? '표정을 잘 따라가고 있어요' : '카메라에 얼굴을 비춰주세요',
                 style: TextStyle(
-                  color: tracking.expression.faceFound ? const Color(0xFF4F6F5C) : const Color(0xFF5B6960),
+                  color: tracking.expression.faceFound ? _sage : _inkSoft,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// 카메라 화면을 거울 프레임에 꽉 차게(cover) 띄우고, 감지된 얼굴의 위치·
-/// 크기에 맞춰 아바타를 그 위에 겹쳐 그립니다. 전체를 한 번에 좌우
-/// 반전해서 실제 거울처럼 보이게 하며, 아바타 위치 계산은 원본(반전 전)
-/// 좌표계에서 이뤄지므로 별도의 좌우 보정이 필요 없습니다.
-// ... Keep your Option classes and constants from the original file ...
-
-// ... (클래스 정의 및 리스트 생략: 원래 코드와 동일)
-
-class _FaceMirror extends StatelessWidget {
-  const _FaceMirror({
-    required this.camera,
-    required this.expression,
-    required this.baseId,
-    required this.hairId,
-    required this.baseColor,
-    required this.moodColor,
-  });
-
-  final CameraController camera;
-  final FaceExpression expression;
-  final String baseId;
-  final String hairId;
-  final Color baseColor;
-  final Color? moodColor;
-
-  static const double _coverageScale = 1.6; // 얼굴을 충분히 덮는 배율
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final double viewW = constraints.maxWidth;
-        final double viewH = constraints.maxHeight;
-        
-        // 카메라 프리뷰 크기 계산 (Cover 방식)
-        final previewSize = camera.value.previewSize!;
-        final double previewAspect = previewSize.height / previewSize.width;
-        
-        double drawW, drawH;
-        if (viewW / viewH > previewAspect) {
-          drawW = viewW;
-          drawH = viewW / previewAspect;
-        } else {
-          drawH = viewH;
-          drawW = viewH * previewAspect;
-        }
-
-        Widget? avatarMask;
-        if (expression.faceFound && expression.faceRect != null) {
-          final rect = expression.faceRect!;
-          final double cx = (rect.left + rect.width / 2) * drawW;
-          final double cy = (rect.top + rect.height / 2) * drawH;
-          final double avatarSize = rect.width * drawW * _coverageScale;
-
-          avatarMask = Positioned(
-            left: cx - avatarSize / 2,
-            top: cy - avatarSize / 2,
-            width: avatarSize,
-            height: avatarSize,
-            child: CustomPaint(
-              painter: AvatarPainter(
-                baseId: baseId, hairId: hairId, baseColor: baseColor,
-                eyeOpenLeft: expression.eyeOpenLeft,
-                eyeOpenRight: expression.eyeOpenRight,
-                mouthOpen: expression.mouthOpen,
-                smile: expression.smile,
-                browRaiseLeft: expression.browRaiseLeft,
-                moodColor: moodColor,
-              ),
-            ),
-          );
-        }
-
-        // 전체를 좌우 반전하여 거울처럼 표시
-        return Transform.scale(
-          scaleX: -1,
-          child: ClipRect(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox(width: drawW, height: drawH, child: CameraPreview(camera)),
-                if (avatarMask != null) avatarMask,
-              ],
-            ),
           ),
         );
       },
