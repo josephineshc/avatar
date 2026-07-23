@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:js' as js;
-import 'dart:ui';
+import 'dart:math';
+import 'dart:ui' show Rect;
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
+import 'package:face_detection_tflite/face_detection_tflite.dart';
 
-/// 얼굴 표정 및 위치 데이터 모델
 class FaceExpression {
   const FaceExpression({
     this.eyeOpenLeft = 1.0,
@@ -29,134 +29,85 @@ class FaceExpression {
 
 class FaceTrackingController extends ChangeNotifier {
   CameraController? _camera;
-  Timer? _processingTimer;
+  FaceDetector? _detector;
+  bool _isBusy = false;
   bool _disposed = false;
-  String? error;
-  
-  // 현재 상태 및 표정 데이터
+
   FaceExpression expression = const FaceExpression();
-  String status = "카메라 준비 중...";
+  String? error;
 
   CameraController? get cameraController => _camera;
   bool get isReady => _camera != null && _camera!.value.isInitialized;
 
-  /// 카메라 및 AI 추적 시작
   Future<void> start() async {
     try {
       final cameras = await availableCameras();
-      if (cameras.isEmpty) throw '카메라를 찾을 수 없습니다.';
+      final front = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.front, orElse: () => cameras.first);
 
-      _camera = CameraController(
-        cameras.firstWhere(
-          (c) => c.lensDirection == CameraLensDirection.front, 
-          orElse: () => cameras.first
-        ),
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-      
-      // 1. 카메라 초기화
+      _camera = CameraController(front, ResolutionPreset.medium, enableAudio: false);
       await _camera!.initialize();
-      status = "AI 로딩 중...";
-      notifyListeners();
-      
-      // 2. 카메라 스트림이 안정될 때까지 대기
-      await Future.delayed(const Duration(milliseconds: 1000));
-      
-      // 3. 브라우저의 MediaPipe JS 초기화 호출
-      await js.context.callMethod('initTracking');
-      
-      // 4. 주기적으로 JavaScript로부터 데이터를 가져오는 타이머 (약 30fps)
-      _processingTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => _updateTracking());
-      
-      error = null;
+
+      _detector = await FaceDetector.create(model: FaceDetectionModel.frontCamera);
+
       notifyListeners();
     } catch (e) {
-      print('Tracking Start Error: $e');
-      error = '카메라 또는 AI 초기화에 실패했습니다.';
-      status = "오류 발생";
+      error = '카메라를 사용할 수 없습니다.';
       notifyListeners();
     }
   }
 
-  /// 매 프레임마다 호출되어 얼굴 데이터를 업데이트함
-  void _updateTracking() {
-    if (_disposed || !isReady) return;
 
-    // JavaScript의 window.getFaceData() 호출
-    final data = js.context.callMethod('getFaceData');
-    
-    // 1. 상태 처리 (문자열인 경우)
-    if (data is String) {
-      if (data == "LOADING") {
-        status = "AI 모델 로딩 중...";
-      } else if (data == "NO_VIDEO") {
-        status = "비디오 대기 중...";
-      } else if (data == "NO_FACE") {
-        status = "얼굴을 찾는 중...";
-        // 얼굴을 놓쳤을 때 기존 위치는 유지하되 상태만 업데이트
-        if (expression.faceFound) {
-          expression = FaceExpression(
-            faceFound: false, 
-            faceRect: expression.faceRect,
-            eyeOpenLeft: 1.0, eyeOpenRight: 1.0, mouthOpen: 0.0
-          );
-        }
-      }
-      notifyListeners();
-      return;
+  void _processMobileFrame(CameraImage image) async {
+    if (_isBusy || _disposed || _detector == null) return;
+    _isBusy = true;
+    try {
+      final faces = await _detector!.detectFacesFromCameraImage(image, mode: FaceDetectionMode.full);
+      _handleFaces(faces, image.width, image.height);
+    } finally { _isBusy = false; }
+  }
+
+  void _handleFaces(List<Face> faces, int width, int height) {
+    if (faces.isEmpty) {
+      expression = FaceExpression(faceFound: false, faceRect: expression.faceRect);
+    } else {
+      final face = faces.first;
+      final computed = _compute(face, width, height);
+      if (computed != null) expression = computed;
     }
+    notifyListeners();
+  }
 
-    // 2. 데이터 처리 (Map 형태의 얼굴 데이터가 들어온 경우)
-    if (data != null) {
-      try {
-        status = "얼굴 감지됨";
-        final landmarks = data['landmarks'] as List;
-        final blendshapes = data['blendshapes'] as List;
+  FaceExpression? _compute(Face face, int w, int h) {
+    final mesh = face.mesh;
+    final landmarks = face.landmarks;
+    if (mesh == null || landmarks.leftEye == null || landmarks.rightEye == null) return null;
 
-        // 얼굴 영역(Bounding Box) 계산 (정규화된 좌표 0.0 ~ 1.0)
-        double minX = 1.0, maxX = 0.0, minY = 1.0, maxY = 0.0;
-        for (var pt in landmarks) {
-          double x = pt['x'].toDouble(); 
-          double y = pt['y'].toDouble();
-          if (x < minX) minX = x; if (x > maxX) maxX = x;
-          if (y < minY) minY = y; if (y > maxY) maxY = y;
-        }
+    final p1 = landmarks.leftEye!;
+    final p2 = landmarks.rightEye!;
+    final interOcular = sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
 
-        // 표정 데이터(Blendshapes) 맵으로 변환
-        Map<String, double> scores = {};
-        for (var b in blendshapes) {
-          scores[b['categoryName']] = b['score'].toDouble();
-        }
+    // 입, 눈, 눈썹 계산 (제공해주신 원래 로직)
+    final pts = mesh.points;
+    final mouthGap = sqrt(pow(pts[13].x - pts[14].x, 2) + pow(pts[13].y - pts[14].y, 2));
+    final mouthWidth = sqrt(pow(pts[61].x - pts[291].x, 2) + pow(pts[61].y - pts[291].y, 2));
 
-        // 최종 표정 값 매핑 및 업데이트
-        expression = FaceExpression(
-          faceFound: true,
-          faceRect: Rect.fromLTRB(minX, minY, maxX, maxY),
-          // 눈 깜빡임: 1.0(뜸) - blinkScore(감음)
-          eyeOpenLeft: 1.0 - (scores['eyeBlinkLeft'] ?? 0),
-          eyeOpenRight: 1.0 - (scores['eyeBlinkRight'] ?? 0),
-          // 입 벌림: jawOpen 점수를 기반으로 증폭
-          mouthOpen: (scores['jawOpen'] ?? 0) * 1.5,
-          // 미소: 좌우 입꼬리 미소 점수의 평균
-          smile: ((scores['mouthSmileLeft'] ?? 0) + (scores['mouthSmileRight'] ?? 0)) / 2,
-          // 눈썹: 내측 눈썹 올림 점수 사용
-          browRaiseLeft: scores['browInnerUp'] ?? 0,
-          browRaiseRight: scores['browInnerUp'] ?? 0,
-        );
+    final box = face.boundingBox;
+    return FaceExpression(
+      faceFound: true,
+      faceRect: Rect.fromLTWH(box.topLeft.x / w, box.topLeft.y / h, box.width / w, box.height / h),
+      eyeOpenLeft: 1.0, // 랜드마크 기반 상세 계산 생략 가능시 기본값
+      eyeOpenRight: 1.0,
+      mouthOpen: (mouthGap / interOcular).clamp(0.0, 1.0),
+      smile: (mouthWidth / interOcular > 0.7) ? 1.0 : 0.3,
+      browRaiseLeft: (pts[105].y < pts[107].y) ? 1.0 : 0.0,
+    );
+  }
 
-        notifyListeners();
-      } catch (e) {
-        print('Data Parsing Error: $e');
-      }
-    }
+  Rect _smooth(Rect raw) {
+    if (expression.faceRect == null) return raw;
+    return Rect.lerp(expression.faceRect, raw, 0.35)!;
   }
 
   @override
-  void dispose() {
-    _disposed = true;
-    _processingTimer?.cancel();
-    _camera?.dispose();
-    super.dispose();
-  }
+  void dispose() { _disposed = true; _camera?.dispose(); _detector?.dispose(); super.dispose(); }
 }

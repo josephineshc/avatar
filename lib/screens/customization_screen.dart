@@ -389,14 +389,6 @@ class _MirrorPanel extends StatelessWidget {
                       color: tracking.expression.faceFound ? const Color(0xFF4F6F5C) : const Color(0xFF8B85B8),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      tracking.status, // 컨트롤러의 status 글자를 여기서 보여줍니다.
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: tracking.expression.faceFound ? const Color(0xFF4F6F5C) : const Color(0xFF8B85B8),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -450,6 +442,8 @@ class _MirrorPanel extends StatelessWidget {
 /// 좌표계에서 이뤄지므로 별도의 좌우 보정이 필요 없습니다.
 // ... Keep your Option classes and constants from the original file ...
 
+// ... (클래스 정의 및 리스트 생략: 원래 코드와 동일)
+
 class _FaceMirror extends StatelessWidget {
   const _FaceMirror({
     required this.camera,
@@ -467,19 +461,21 @@ class _FaceMirror extends StatelessWidget {
   final Color baseColor;
   final Color? moodColor;
 
+  static const double _coverageScale = 1.6; // 얼굴을 충분히 덮는 배율
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final viewW = constraints.maxWidth;
-        final viewH = constraints.maxHeight;
+        final double viewW = constraints.maxWidth;
+        final double viewH = constraints.maxHeight;
         
+        // 카메라 프리뷰 크기 계산 (Cover 방식)
         final previewSize = camera.value.previewSize!;
-        final previewAspect = previewSize.height / previewSize.width;
-        final viewAspect = viewW / viewH;
-
+        final double previewAspect = previewSize.height / previewSize.width;
+        
         double drawW, drawH;
-        if (viewAspect > previewAspect) {
+        if (viewW / viewH > previewAspect) {
           drawW = viewW;
           drawH = viewW / previewAspect;
         } else {
@@ -487,72 +483,46 @@ class _FaceMirror extends StatelessWidget {
           drawW = viewH * previewAspect;
         }
 
-        final offsetX = (viewW - drawW) / 2;
-        final offsetY = (viewH - drawH) / 2;
+        Widget? avatarMask;
+        if (expression.faceFound && expression.faceRect != null) {
+          final rect = expression.faceRect!;
+          final double cx = (rect.left + rect.width / 2) * drawW;
+          final double cy = (rect.top + rect.height / 2) * drawH;
+          final double avatarSize = rect.width * drawW * _coverageScale;
 
-        return Stack(
-          children: [
-            // 1. Camera Feed (Mirrored)
-            Center(
-              child: Transform.scale(
-                scaleX: -1,
-                child: SizedBox(
-                  width: drawW,
-                  height: drawH,
-                  child: CameraPreview(camera),
-                ),
+          avatarMask = Positioned(
+            left: cx - avatarSize / 2,
+            top: cy - avatarSize / 2,
+            width: avatarSize,
+            height: avatarSize,
+            child: CustomPaint(
+              painter: AvatarPainter(
+                baseId: baseId, hairId: hairId, baseColor: baseColor,
+                eyeOpenLeft: expression.eyeOpenLeft,
+                eyeOpenRight: expression.eyeOpenRight,
+                mouthOpen: expression.mouthOpen,
+                smile: expression.smile,
+                browRaiseLeft: expression.browRaiseLeft,
+                moodColor: moodColor,
               ),
             ),
+          );
+        }
 
-            // 2. Avatar Overlay (Mirrored to match camera)
-            if (expression.faceFound && expression.faceRect != null)
-              Center(
-                child: Transform.scale(
-                  scaleX: -1,
-                  child: SizedBox(
-                    width: drawW,
-                    height: drawH,
-                    child: Stack(
-                      children: [
-                        _buildAvatar(expression.faceRect!, drawW, drawH),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
+        // 전체를 좌우 반전하여 거울처럼 표시
+        return Transform.scale(
+          scaleX: -1,
+          child: ClipRect(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(width: drawW, height: drawH, child: CameraPreview(camera)),
+                if (avatarMask != null) avatarMask,
+              ],
+            ),
+          ),
         );
       },
-    );
-  }
-
-  Widget _buildAvatar(Rect rect, double w, double h) {
-    // 1. Calculate face center in pixels
-    final cx = (rect.left + rect.width / 2) * w;
-    final cy = (rect.top + rect.height / 2) * h;
-    
-    // 2. Avatar size (1.8x the detected face width to cover ears/hair)
-    final avatarSize = rect.width * w * 1.8;
-
-    return Positioned(
-      left: cx - (avatarSize / 2),
-      top: cy - (avatarSize / 2),
-      width: avatarSize,
-      height: avatarSize,
-      child: CustomPaint(
-        painter: AvatarPainter(
-          baseId: baseId,
-          hairId: hairId,
-          baseColor: baseColor,
-          eyeOpenLeft: expression.eyeOpenLeft,
-          eyeOpenRight: expression.eyeOpenRight,
-          mouthOpen: expression.mouthOpen,
-          smile: expression.smile,
-          browRaiseLeft: expression.browRaiseLeft,
-          browRaiseRight: expression.browRaiseRight,
-          moodColor: moodColor,
-        ),
-      ),
     );
   }
 }
