@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/avatar/">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Avatar Face Masking">
+
+  <!-- MediaPipe Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3"></script>
+
+  <title>Avatar Mirror</title>
+  
+  <script>
+    let faceLandmarker;
+    let videoElement;
+
+    // Initialize MediaPipe
+    async function initTracking() {
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+      );
+      faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+          delegate: "GPU"
+        },
+        outputFaceBlendshapes: true,
+        runningMode: "VIDEO",
+        numFaces: 1
+      });
+      console.log("MediaPipe Face Landmarker Initialized");
+    }
+
+    // Bridge to find the video element created by Flutter Camera Plugin
+    window.getFaceData = function() {
+      if (!faceLandmarker) return null;
+      
+      // Find the camera video element in the DOM
+      if (!videoElement) {
+        videoElement = document.querySelector('video');
+      }
+
+      if (!videoElement || videoElement.readyState !== 4) return null;
+
+      const result = faceLandmarker.detectForVideo(videoElement, performance.now());
+      
+      if (result.faceLandmarks && result.faceLandmarks.length > 0) {
+        return {
+          landmarks: result.faceLandmarks[0],
+          blendshapes: result.faceBlendshapes[0].categories
+        };
+      }
+      return null;
+    };
+  </script>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
