@@ -354,7 +354,7 @@ class _MirrorPanel extends StatelessWidget {
           child: Text(
             tracking.error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: _inkSoft, height: 1.5),
+            style: const TextStyle(color: Color(0xFF5B6960), height: 1.5),
           ),
         ),
       );
@@ -371,35 +371,52 @@ class _MirrorPanel extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // --- 이 부분이 상태 메시지 배지입니다 ---
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: _lavenderLight, borderRadius: BorderRadius.circular(999)),
-                child: const Row(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: tracking.expression.faceFound 
+                      ? const Color(0xFFDCE7DF) // 얼굴 찾았을 때 연두색
+                      : const Color(0xFFEDEAF6), // 못 찾았을 때 연보라색
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.auto_awesome, size: 12, color: _lavender),
-                    SizedBox(width: 4),
-                    Text('실시간 거울', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _lavender)),
+                    Icon(
+                      tracking.expression.faceFound ? Icons.face : Icons.hourglass_empty,
+                      size: 14,
+                      color: tracking.expression.faceFound ? const Color(0xFF4F6F5C) : const Color(0xFF8B85B8),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      tracking.status, // 컨트롤러의 status 글자를 여기서 보여줍니다.
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: tracking.expression.faceFound ? const Color(0xFF4F6F5C) : const Color(0xFF8B85B8),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
 
               // 거울 프레임
               Container(
                 width: mirrorWidth,
                 height: mirrorHeight,
                 decoration: BoxDecoration(
-                  color: _sageLight,
+                  color: const Color(0xFFDCE7DF),
                   borderRadius: BorderRadius.circular(32),
-                  border: Border.all(color: _line, width: 1.5),
+                  border: Border.all(color: const Color(0xFFE1E6DF), width: 1.5),
                   boxShadow: [
-                    BoxShadow(color: _ink.withOpacity(0.08), blurRadius: 28, offset: const Offset(0, 12)),
+                    BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 28, offset: const Offset(0, 12)),
                   ],
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: cameraReady
-                    ? _FaceMirror(
+                    ? _FaceMirror( // 아까 드린 _FaceMirror 클래스가 여기 호출됨
                         camera: camera,
                         expression: tracking.expression,
                         baseId: baseId,
@@ -407,14 +424,14 @@ class _MirrorPanel extends StatelessWidget {
                         baseColor: baseColor,
                         moodColor: moodColor,
                       )
-                    : Container(color: _sageLight),
+                    : const Center(child: CircularProgressIndicator()), // 로딩 뱅글이
               ),
 
               const SizedBox(height: 14),
               Text(
                 tracking.expression.faceFound ? '표정을 잘 따라가고 있어요' : '카메라에 얼굴을 비춰주세요',
                 style: TextStyle(
-                  color: tracking.expression.faceFound ? _sage : _inkSoft,
+                  color: tracking.expression.faceFound ? const Color(0xFF4F6F5C) : const Color(0xFF5B6960),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
