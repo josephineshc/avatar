@@ -1,22 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!-- 아래 이 한 줄이 에러 해결의 핵심입니다. 절대 지우거나 수정하지 마세요 -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Avatar Face Masking">
 
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="avatar">
-
   <title>Avatar Mirror</title>
 
-  <!-- MediaPipe Scripts 로드 -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3"></script>
+  <!-- MediaPipe 라이브러리 로드 (버전 고정) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3" type="text/javascript"></script>
 
   <script>
     let faceLandmarker;
@@ -25,13 +19,17 @@
     // AI 초기화 함수
     async function initTracking() {
       try {
-        if (typeof tasksVision === 'undefined') {
-          throw new Error("MediaPipe 라이브러리 로드 실패");
+        // 라이브러리 이름이 'tasksVision'이 아닐 경우를 대비해 윈도우 객체에서 직접 확인
+        const visionModule = window.tasksVision;
+        if (!visionModule) {
+          throw new Error("MediaPipe global 'tasksVision' is not found.");
         }
-        const vision = await tasksVision.FilesetResolver.forVisionTasks(
+
+        const vision = await visionModule.FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
         );
-        faceLandmarker = await tasksVision.FaceLandmarker.createFromOptions(vision, {
+
+        faceLandmarker = await visionModule.FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
             delegate: "GPU"
@@ -40,18 +38,22 @@
           runningMode: "VIDEO",
           numFaces: 1
         });
-        console.log("MediaPipe initialized");
+        
+        console.log("MediaPipe initialized successfully");
       } catch (e) {
-        console.error("AI Init Error:", e);
-        throw e;
+        console.error("JS AI Init Error:", e);
+        throw e; // Dart에 에러를 던집니다.
       }
     }
 
-    // Dart에서 호출하여 얼굴 데이터를 가져가는 함수
     window.getFaceData = function() {
-      if (!faceLandmarker) return null;
-      if (!videoElement) videoElement = document.querySelector('video');
-      if (!videoElement || videoElement.readyState !== 4) return null;
+      if (!faceLandmarker) return "LOADING";
+      
+      if (!videoElement) {
+        videoElement = document.querySelector('video');
+      }
+
+      if (!videoElement || videoElement.readyState !== 4) return "NO_VIDEO";
 
       try {
         const result = faceLandmarker.detectForVideo(videoElement, performance.now());
@@ -62,9 +64,9 @@
           };
         }
       } catch (e) {
-        return null;
+        return "ERROR";
       }
-      return null;
+      return "NO_FACE";
     };
   </script>
 </head>
