@@ -19,7 +19,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.24.5' # Using a known stable version
+          flutter-version: 'any' # Get the latest stable version
 
       - name: Enable Web Support
         run: flutter config --enable-web
@@ -31,8 +31,6 @@ jobs:
         run: flutter pub get
 
       - name: Build Web
-        # Removed the problematic --web-renderer flag. 
-        # Flutter 3.24+ will choose CanvasKit automatically for complex apps.
         run: flutter build web --release --base-href "/avatar/"
 
       - name: Deploy
