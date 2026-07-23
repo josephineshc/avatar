@@ -150,7 +150,6 @@ class _CustomizationScreenState extends State<CustomizationScreen> {
                 baseId: _baseId,
                 hairId: _hairId,
                 baseColor: _baseColor,
-                outfitColor: _outfitColor,
                 moodColor: _moodColor,
               ),
             ),
@@ -343,13 +342,14 @@ class _ColorGrid extends StatelessWidget {
 
 /// 화면 정중앙에 큰 '거울'(카메라 프리뷰)을 놓고, 그 위에 아바타를 겹쳐
 /// 그려서 마치 거울에 비친 내 얼굴이 아바타로 바뀐 것처럼 보이게 합니다.
+// ... (Keep all your Option classes and constants from your snippet)
+
 class _MirrorPanel extends StatelessWidget {
   const _MirrorPanel({
     required this.tracking,
     required this.baseId,
     required this.hairId,
     required this.baseColor,
-    required this.outfitColor,
     required this.moodColor,
   });
 
@@ -357,28 +357,18 @@ class _MirrorPanel extends StatelessWidget {
   final String baseId;
   final String hairId;
   final Color baseColor;
-  final Color outfitColor;
   final Color? moodColor;
 
   @override
   Widget build(BuildContext context) {
     if (tracking.error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            tracking.error!,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: _inkSoft, height: 1.5),
-          ),
-        ),
-      );
+      return Center(child: Text(tracking.error!));
     }
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final mirrorWidth = (constraints.maxWidth * 0.72).clamp(220.0, 340.0);
-        final mirrorHeight = (mirrorWidth * 1.3).clamp(280.0, constraints.maxHeight * 0.8);
+        final double mirrorWidth = (constraints.maxWidth * 0.72).clamp(220.0, 340.0);
+        final double mirrorHeight = (mirrorWidth * 1.3).clamp(280.0, constraints.maxHeight * 0.8);
         final camera = tracking.cameraController;
         final cameraReady = tracking.isReady && camera != null && camera.value.isInitialized;
 
@@ -386,6 +376,7 @@ class _MirrorPanel extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Real-time badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(color: _lavenderLight, borderRadius: BorderRadius.circular(999)),
@@ -394,13 +385,13 @@ class _MirrorPanel extends StatelessWidget {
                   children: [
                     Icon(Icons.auto_awesome, size: 12, color: _lavender),
                     SizedBox(width: 4),
-                    Text('실시간 거울', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _lavender)),
+                    Text('실시간 거울', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _lavender)),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
 
-              // 거울 프레임
+              // Mirror Frame
               Container(
                 width: mirrorWidth,
                 height: mirrorHeight,
@@ -408,74 +399,118 @@ class _MirrorPanel extends StatelessWidget {
                   color: _sageLight,
                   borderRadius: BorderRadius.circular(32),
                   border: Border.all(color: _line, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(color: _ink.withOpacity(0.08), blurRadius: 28, offset: const Offset(0, 12)),
-                  ],
+                  boxShadow: [BoxShadow(color: _ink.withOpacity(0.08), blurRadius: 28, offset: const Offset(0, 12))],
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // 배경: 실제 카메라 화면 (거울처럼 좌우 반전)
-                    if (cameraReady)
-                      Positioned.fill(
-                        child: Transform.scale(
-                          scaleX: -1,
-                          child: CameraPreview(camera),
-                        ),
-                      ),
-                    // 카메라 위를 살짝 눌러서 아바타가 더 도드라지도록
-                    if (cameraReady) Positioned.fill(child: Container(color: Colors.black.withOpacity(0.06))),
-
-                    // 숨쉬는 오라
-                    Container(
-                      width: mirrorWidth * 0.62,
-                      height: mirrorWidth * 0.62,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            (moodColor ?? _sage).withOpacity(0.32),
-                            (moodColor ?? _sage).withOpacity(0.0),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // 아바타 — 거울(카메라 화면) 위에 그대로 매핑
-                    SizedBox(
-                      width: mirrorWidth * 0.56,
-                      height: mirrorWidth * 0.56,
-                      child: CustomPaint(
-                        painter: AvatarPainter(
-                          baseId: baseId,
-                          hairId: hairId,
-                          baseColor: baseColor,
-                          eyeOpenLeft: tracking.expression.eyeOpenLeft,
-                          eyeOpenRight: tracking.expression.eyeOpenRight,
-                          mouthOpen: tracking.expression.mouthOpen,
-                          smile: tracking.expression.smile,
-                          moodColor: moodColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                child: cameraReady
+                    ? _FaceMirror(
+                        camera: camera,
+                        expression: tracking.expression,
+                        baseId: baseId,
+                        hairId: hairId,
+                        baseColor: baseColor,
+                        moodColor: moodColor,
+                      )
+                    : const Center(child: CircularProgressIndicator()),
               ),
-
               const SizedBox(height: 14),
               Text(
                 tracking.expression.faceFound ? '표정을 잘 따라가고 있어요' : '카메라에 얼굴을 비춰주세요',
-                style: TextStyle(
-                  color: tracking.expression.faceFound ? _sage : _inkSoft,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(color: tracking.expression.faceFound ? _sage : _inkSoft, fontSize: 13),
               ),
             ],
           ),
         );
       },
     );
+  }
+}
+
+class _FaceMirror extends StatelessWidget {
+  const _FaceMirror({
+    required this.camera,
+    required this.expression,
+    required this.baseId,
+    required this.hairId,
+    required this.baseColor,
+    required this.moodColor,
+  });
+
+  final CameraController camera;
+  final FaceExpression expression;
+  final String baseId;
+  final String hairId;
+  final Color baseColor;
+  final Color? moodColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final double containerW = constraints.maxWidth;
+      final double containerH = constraints.maxHeight;
+      
+      // Calculate Video Scaling (Cover)
+      final previewSize = camera.value.previewSize!;
+      final double previewAspect = previewSize.height / previewSize.width;
+      
+      double drawW, drawH;
+      if (containerW / containerH > previewAspect) {
+        drawW = containerW;
+        drawH = containerW / previewAspect;
+      } else {
+        drawH = containerH;
+        drawW = containerH * previewAspect;
+      }
+
+      final double offsetX = (containerW - drawW) / 2;
+      final double offsetY = (containerH - drawH) / 2;
+
+      Widget? avatarMask;
+      if (expression.faceFound && expression.faceRect != null) {
+        final rect = expression.faceRect!;
+        final double cx = (rect.left + rect.width / 2) * drawW;
+        final double cy = (rect.top + rect.height / 2) * drawH;
+        
+        // Face Mask scale (1.6 to cover hair/ears)
+        final double avatarSize = rect.width * drawW * 1.6;
+
+        avatarMask = Positioned(
+          left: offsetX + cx - (avatarSize / 2),
+          top: offsetY + cy - (avatarSize / 2),
+          width: avatarSize,
+          height: avatarSize,
+          child: CustomPaint(
+            painter: AvatarPainter(
+              baseId: baseId,
+              hairId: hairId,
+              baseColor: baseColor,
+              eyeOpenLeft: expression.eyeOpenLeft,
+              eyeOpenRight: expression.eyeOpenRight,
+              mouthOpen: expression.mouthOpen,
+              smile: expression.smile,
+              browRaiseLeft: expression.browRaiseLeft,
+              browRaiseRight: expression.browRaiseRight,
+              moodColor: moodColor,
+            ),
+          ),
+        );
+      }
+
+      return Transform.scale(
+        scaleX: -1, // Flip the entire mirror
+        child: Stack(
+          children: [
+            Center(
+              child: SizedBox(
+                width: drawW,
+                height: drawH,
+                child: CameraPreview(camera),
+              ),
+            ),
+            if (avatarMask != null) avatarMask,
+          ],
+        ),
+      );
+    });
   }
 }
