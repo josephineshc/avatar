@@ -39,22 +39,32 @@ class FaceTrackingController extends ChangeNotifier {
   Future<void> start() async {
     try {
       final cameras = await availableCameras();
+      if (cameras.isEmpty) throw '카메라를 찾을 수 없습니다.';
+
       _camera = CameraController(
-        cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.front),
+        cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.front, orElse: () => cameras.first),
         ResolutionPreset.medium,
         enableAudio: false,
       );
+      
+      // 1. 카메라 시작
       await _camera!.initialize();
       
-      // Initialize MediaPipe JS
+      // 2. 중요: 카메라 화면이 브라우저에 렌더링될 때까지 잠깐 대기 (0.5초~1초)
+      // 이 과정이 없으면 AI가 빈 화면을 읽으려고 시도하다가 에러가 납니다.
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      // 3. AI 초기화
       await js.context.callMethod('initTracking');
       
-      // Start polling JS for data
-      _processingTimer = Timer.periodic(const Duration(milliseconds: 30), (_) => _updateTracking());
+      _processingTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => _updateTracking());
       
+      error = null;
       notifyListeners();
     } catch (e) {
-      error = '카메라를 시작할 수 없습니다. HTTPS 환경인지 확인해주세요.';
+      print('Tracking Start Error: $e');
+      // 에러 메시지를 더 구체적으로 변경하여 원인 파악을 돕습니다.
+      error = '카메라 연결에 실패했습니다.\n잠시 후 다시 시도해주세요.';
       notifyListeners();
     }
   }
