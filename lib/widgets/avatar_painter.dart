@@ -36,7 +36,6 @@ class AvatarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.width <= 0)
     final s = size.width / 240;
     Offset p(double x, double y) => Offset(x * s, y * s);
     double u(double v) => v * s;
