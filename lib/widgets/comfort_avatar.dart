@@ -2,13 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// 편안함을 주는 것을 목표로 설계한 아바타 위젯입니다.
-///
-/// 디자인 의도:
-/// - 숨쉬듯 은은하게 커졌다 작아지는 오라 → 긴장을 낮추는 리듬감
-/// - 완만한 곡선의 눈(무표정도 화난 표정도 아닌 '차분한' 눈) → 위협적이지 않은 인상
-/// - 아주 천천히 위아래로 흔들리는 idle 모션 → 정적인 이미지보다 살아있는 느낌
-/// - 일정 주기로 자연스럽게 눈을 깜빡임 → 지켜보고 있다는 느낌을 줄여 부담 완화
 class ComfortAvatar extends StatefulWidget {
   const ComfortAvatar({
     super.key,
@@ -91,8 +84,8 @@ class _ComfortAvatarState extends State<ComfortAvatar>
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        widget.auraColor.withOpacity(0.22),
-                        widget.auraColor.withOpacity(0.0),
+                        widget.auraColor.withValues(alpha: 0.22),
+                        widget.auraColor.withValues(alpha: 0.0),
                       ],
                     ),
                   ),
@@ -136,7 +129,7 @@ class _FacePainter extends CustomPainter {
     canvas.drawCircle(center, radius, Paint()..color = baseColor);
 
     // 볼
-    final cheekPaint = Paint()..color = const Color(0xFFFF9B9B).withOpacity(0.32);
+    final cheekPaint = Paint()..color = const Color(0xFFFF9B9B).withValues(alpha: 0.32);
     canvas.drawCircle(
       Offset(center.dx - radius * 0.42, center.dy + radius * 0.12),
       radius * 0.11,
@@ -181,7 +174,6 @@ class _FacePainter extends CustomPainter {
       );
     }
 
-    // 입 (부드러운 미소)
     final mouthPath = Path()
       ..moveTo(center.dx - radius * 0.17, center.dy + radius * 0.28)
       ..quadraticBezierTo(
